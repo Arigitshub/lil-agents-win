@@ -162,19 +162,21 @@
   <div class="separator"></div>
   <div id="messages"></div>
   <div class="input-area">
-    <input id="input" placeholder="Ask Claude..." autofocus>
+    <input id="input" placeholder="Ask..." autofocus>
   </div>
 </div>
 <script>
   const params = new URLSearchParams(window.location.search);
   const agentName = params.get('name') || 'Agent';
   let theme = (params.get('theme') || 'Peach').toLowerCase();
+  let provider = params.get('provider') || 'Claude';
 
   document.body.className = `theme-${theme}`;
-  document.getElementById('title').textContent = `${agentName} — Claude`;
+  document.getElementById('title').textContent = `${agentName} — ${provider}`;
 
   const messages = document.getElementById('messages');
   const input = document.getElementById('input');
+  input.placeholder = `Ask ${provider}...`;
   let currentStreamEl = null;
   let lastAssistantText = '';
 
@@ -269,6 +271,13 @@
     document.body.className = `theme-${theme}`;
   });
 
+  window.lilAgents.onProviderChange((name) => {
+    provider = name;
+    document.getElementById('title').textContent = `${agentName} — ${provider}`;
+    input.placeholder = `Ask ${provider}...`;
+    appendMsg('bot', `switched to ${provider.toLowerCase()}. ask me anything.`);
+  });
+
   // Buttons
   document.getElementById('btn-refresh').addEventListener('click', () => {
     window.lilAgents.resetSession();
@@ -280,7 +289,7 @@
   });
 
   // Welcome
-  appendMsg('bot', `hey! i'm ${agentName.toLowerCase()}. ask me anything.`);
+  appendMsg('bot', `hey! i'm ${agentName.toLowerCase()}, powered by ${provider.toLowerCase()}. ask me anything.`);
 </script>
 </body>
 </html>

@@ -13,7 +13,7 @@ Bruce and Jazz walk back and forth above your taskbar. Click one to open an AI t
 ## ⚡ quick start
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/lil-agents-win.git
+git clone https://github.com/Arigitshub/lil-agents-win.git
 cd lil-agents-win
 npm install
 npm start
@@ -24,15 +24,17 @@ That's it. Bruce and Jazz will appear above your taskbar.
 ## ✨ features
 
 - 🚶 **Animated characters** — Transparent WebM video with alpha, walking with eased motion curves
-- 💬 **Click to chat** — Each character opens a real AI terminal powered by Claude Code
+- 💬 **Click to chat** — Each character opens a real AI terminal
+- 🤖 **Multi-provider** — Claude, Codex, Gemini, Copilot, OpenCode — switch from the system tray
 - 🎨 **Four themes** — Peach, Midnight, Cloud, Moss (switch from the system tray)
 - 💭 **Thinking bubbles** — Playful phrases while your agent works ("vibing...", "cooking...", "don't rush me")
-- 🔔 **Completion alerts** — Characters celebrate when Claude finishes ("ta-da!", "boom!")
+- 🔔 **Completion alerts** — Characters celebrate when done ("ta-da!", "boom!")
 - 🖥️ **Taskbar native** — Characters walk *above* your taskbar, never behind it
 - 🖱️ **Click-through** — Transparent windows don't block your desktop
-- ⚙️ **System tray** — Toggle characters, themes, and sounds from the tray icon
+- ⚙️ **System tray** — Toggle characters, providers, themes, and sounds
 - ⌨️ **Slash commands** — `/clear`, `/copy` in the chat terminal
-- 🔄 **Session management** — Refresh button to restart Claude sessions
+- 🔄 **Session management** — Refresh button to restart sessions
+- 🔍 **Auto-detect** — Automatically finds which AI CLIs are installed
 
 ## 🎨 themes
 
@@ -40,12 +42,23 @@ That's it. Bruce and Jazz will appear above your taskbar.
 |----------|-------------|----------|---------|
 | Playful pink & warm | Dark mode + orange accents | Clean Fluent UI | Retro organic terminal |
 
+## 🤖 supported providers
+
+| Provider | Binary | Install | Input Mode |
+|----------|--------|---------|------------|
+| **Claude** | `claude` | `npm i -g @anthropic-ai/claude-code` | Stream JSON (persistent) |
+| **Codex** | `codex` | `npm i -g @openai/codex` | Per-message spawn |
+| **Gemini** | `gemini` | `npm i -g @google/gemini-cli` | Per-message spawn |
+| **Copilot** | `copilot` | `npm i -g @github/copilot-cli` | Per-message spawn |
+| **OpenCode** | `opencode` | `curl -fsSL https://opencode.ai/install \| bash` | Per-message spawn |
+
+Switch providers from the **system tray → Provider** menu. The app auto-detects which CLIs you have installed.
+
 ## 🛠️ requirements
 
 - **Windows 10/11**
-- At least one supported AI CLI installed:
-  - [Claude Code](https://claude.ai/download) — `npm install -g @anthropic-ai/claude-code`
-  - More providers coming soon (Codex, Copilot, Gemini)
+- **Node.js 18+**
+- At least one supported AI CLI installed (see table above)
 
 ## 🏗️ architecture
 
@@ -80,11 +93,12 @@ lil-agents-win/
 ## 🤝 contributing
 
 PRs welcome! Some ideas:
-- Add more AI providers (Codex, Copilot, Gemini)
+- Add more AI providers
 - Add more characters
 - Add sound effects
 - Add an installer/auto-updater
 - Multi-monitor support
+- Custom API endpoint support
 
 ## 📄 license
 

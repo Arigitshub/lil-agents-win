@@ -1,6 +1,58 @@
 const { app, BrowserWindow, Tray, Menu, screen, ipcMain, nativeImage } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
+
+// ── Provider definitions (mirrors AgentSession.swift) ─────────────────────────
+const PROVIDERS = {
+  claude: {
+    name: 'Claude',
+    binary: 'claude',
+    args: ['-p', '--output-format', 'stream-json', '--input-format', 'stream-json', '--verbose', '--dangerously-skip-permissions'],
+    inputMode: 'stream-json', // sends JSON to stdin
+    install: 'npm install -g @anthropic-ai/claude-code',
+  },
+  codex: {
+    name: 'Codex',
+    binary: 'codex',
+    args: ['exec', '--json', '--full-auto', '--skip-git-repo-check'],
+    inputMode: 'arg', // message is appended as last arg
+    install: 'npm install -g @openai/codex',
+  },
+  gemini: {
+    name: 'Gemini',
+    binary: 'gemini',
+    args: ['--yolo', '-p'],
+    inputMode: 'arg',
+    install: 'npm install -g @google/gemini-cli',
+  },
+  copilot: {
+    name: 'Copilot',
+    binary: 'copilot',
+    args: ['-p'],
+    inputMode: 'arg',
+    install: 'npm install -g @github/copilot-cli',
+  },
+  opencode: {
+    name: 'OpenCode',
+    binary: 'opencode',
+    args: ['-p'],
+    inputMode: 'arg',
+    install: 'curl -fsSL https://opencode.ai/install | bash',
+  },
+};
+
+function detectAvailableProviders() {
+  const available = {};
+  for (const [key, prov] of Object.entries(PROVIDERS)) {
+    try {
+      execSync(`where ${prov.binary}`, { stdio: 'ignore' });
+      available[key] = true;
+    } catch {
+      available[key] = false;
+    }
+  }
+  return available;
+}
 
 // ── Character state (mirrors WalkerCharacter.swift) ───────────────────────────
 class WalkerCharacter {
@@ -163,9 +215,16 @@ let tickInterval = null;
 
 const THEMES = ['Peach', 'Midnight', 'Cloud', 'Moss'];
 let currentTheme = 'Peach';
+let currentProvider = 'claude';
 let soundsEnabled = true;
+let availableProviders = {};
 
 app.whenReady().then(() => {
+  availableProviders = detectAvailableProviders();
+  // Auto-select first available provider
+  const firstAvailable = Object.keys(PROVIDERS).find(k => availableProviders[k]);
+  if (firstAvailable) currentProvider = firstAvailable;
+
   // Create characters
   const bruce = new WalkerCharacter('Bruce', 'walk-bruce.webm', {
     accelStart: 3.0, fullSpeedStart: 3.75, decelStart: 8.0, walkStop: 8.5,
@@ -195,16 +254,8 @@ app.whenReady().then(() => {
 
   ipcMain.on('send-message', (e, msg) => {
     const char = characters.find(c => c.popoverWin && c.popoverWin.webContents === e.sender);
-    if (!char || !char.process) return;
-    const payload = JSON.stringify({
-      type: 'user',
-      message: { role: 'user', content: msg }
-    }) + '\n';
-    try { char.process.stdin.write(payload); } catch (err) { /* ignore */ }
-    char.isBusy = true;
-    if (char.win && !char.win.isDestroyed()) {
-      char.win.webContents.send('thinking', true);
-    }
+    if (!char) return;
+    sendMessage(char, msg);
   });
 
   ipcMain.on('reset-session', (e) => {
@@ -282,7 +333,7 @@ function openPopover(char) {
     });
     pop.setAlwaysOnTop(true, 'pop-up-menu');
     pop.loadFile(path.join(__dirname, 'renderer', 'terminal.html'), {
-      query: { name: char.name, theme: currentTheme },
+      query: { name: char.name, theme: currentTheme, provider: PROVIDERS[currentProvider].name },
     });
     char.popoverWin = pop;
 
@@ -308,16 +359,34 @@ function closePopover(char) {
   }
 }
 
-// ── CLI session management ──────────────────────────────────────────────────
+// ── CLI session management (multi-provider) ──────────────────────────────────
 function startSession(char) {
   if (char.process) return;
 
-  const proc = spawn('claude', [
-    '-p', '--output-format', 'stream-json',
-    '--input-format', 'stream-json',
-    '--verbose', '--dangerously-skip-permissions'
-  ], { shell: true, env: { ...process.env } });
+  const prov = PROVIDERS[currentProvider];
+  if (!prov) return;
 
+  // Check if the provider binary is available
+  if (!availableProviders[currentProvider]) {
+    if (char.popoverWin && !char.popoverWin.isDestroyed()) {
+      char.popoverWin.webContents.send('cli-error',
+        `${prov.name} CLI not found.\n\nInstall it:\n  ${prov.install}`);
+    }
+    return;
+  }
+
+  char.providerKey = currentProvider;
+
+  // For stream-json providers (Claude), spawn a persistent process
+  if (prov.inputMode === 'stream-json') {
+    const proc = spawn(prov.binary, prov.args, { shell: true, env: { ...process.env } });
+    setupProcessHandlers(char, proc);
+    char.process = proc;
+  }
+  // For arg-based providers, we spawn per-message (handled in sendMessage)
+}
+
+function setupProcessHandlers(char, proc) {
   let lineBuffer = '';
 
   proc.stdout.on('data', (chunk) => {
@@ -332,33 +401,80 @@ function startSession(char) {
           if (char.popoverWin && !char.popoverWin.isDestroyed()) {
             char.popoverWin.webContents.send('cli-data', json);
           }
-          if (json.type === 'result') {
+          // Detect turn completion (varies by provider)
+          const doneTypes = ['result', 'turn.completed', 'done', 'end', 'complete'];
+          if (doneTypes.includes(json.type)) {
             char.isBusy = false;
             if (char.win && !char.win.isDestroyed()) {
               char.win.webContents.send('thinking', false);
               char.win.webContents.send('completion', true);
             }
           }
-        } catch (e) { /* partial JSON, ignore */ }
+        } catch (e) {
+          // Non-JSON line — send as plain text (Gemini fallback)
+          if (char.popoverWin && !char.popoverWin.isDestroyed()) {
+            char.popoverWin.webContents.send('cli-data', {
+              type: 'assistant',
+              message: { content: [{ type: 'text', text: line + '\n' }] }
+            });
+          }
+        }
       }
     }
   });
 
   proc.stderr.on('data', (chunk) => {
-    if (char.popoverWin && !char.popoverWin.isDestroyed()) {
-      char.popoverWin.webContents.send('cli-error', chunk.toString());
+    const text = chunk.toString();
+    const trimmed = text.trim();
+    // Filter spinner noise from Gemini and other CLIs
+    const isNoise = /^[\u2800-\u28FF\u2713\u2192\u25C6]/.test(trimmed) || trimmed === '';
+    if (!isNoise && char.popoverWin && !char.popoverWin.isDestroyed()) {
+      char.popoverWin.webContents.send('cli-error', text);
     }
   });
 
   proc.on('close', () => {
     char.process = null;
-    char.isBusy = false;
+    if (char.isBusy) {
+      char.isBusy = false;
+      if (char.win && !char.win.isDestroyed()) {
+        char.win.webContents.send('thinking', false);
+        char.win.webContents.send('completion', true);
+      }
+    }
     if (char.popoverWin && !char.popoverWin.isDestroyed()) {
       char.popoverWin.webContents.send('cli-exit');
     }
   });
+}
 
-  char.process = proc;
+// Handle sending messages — supports both stream-json and arg-based providers
+function sendMessage(char, msg) {
+  const provKey = char.providerKey || currentProvider;
+  const prov = PROVIDERS[provKey];
+  if (!prov) return;
+
+  char.isBusy = true;
+  if (char.win && !char.win.isDestroyed()) {
+    char.win.webContents.send('thinking', true);
+  }
+
+  if (prov.inputMode === 'stream-json') {
+    // Claude: write JSON to stdin of persistent process
+    if (!char.process) return;
+    const payload = JSON.stringify({
+      type: 'user',
+      message: { role: 'user', content: msg }
+    }) + '\n';
+    try { char.process.stdin.write(payload); } catch (err) { /* ignore */ }
+  } else {
+    // Codex/Gemini/Copilot/OpenCode: spawn a new process per message
+    if (char.process) { try { char.process.kill(); } catch(e) {} }
+    const args = [...prov.args, msg];
+    const proc = spawn(prov.binary, args, { shell: true, env: { ...process.env } });
+    setupProcessHandlers(char, proc);
+    char.process = proc;
+  }
 }
 
 function restartSession(char) {
@@ -366,6 +482,31 @@ function restartSession(char) {
   char.process = null;
   char.isBusy = false;
   startSession(char);
+}
+
+function switchProvider(providerKey) {
+  if (currentProvider === providerKey) return;
+  currentProvider = providerKey;
+
+  // Kill all existing sessions and restart with new provider
+  characters.forEach(c => {
+    if (c.process) { try { c.process.kill(); } catch (e) {} }
+    c.process = null;
+    c.isBusy = false;
+    c.providerKey = providerKey;
+
+    // Update terminal
+    if (c.popoverWin && !c.popoverWin.isDestroyed()) {
+      c.popoverWin.webContents.send('provider-change', PROVIDERS[providerKey].name);
+    }
+
+    // Restart session if popover is open
+    if (c.isIdle) {
+      startSession(c);
+    }
+  });
+
+  rebuildTrayMenu();
 }
 
 // ── Tick loop (like CVDisplayLink) ──────────────────────────────────────────
@@ -402,12 +543,21 @@ function setupTray() {
 }
 
 function rebuildTrayMenu() {
+  const providerSubmenu = Object.entries(PROVIDERS).map(([key, prov]) => ({
+    label: `${prov.name}${availableProviders[key] ? '' : ' (not installed)'}`,
+    type: 'radio',
+    checked: key === currentProvider,
+    enabled: availableProviders[key],
+    click: () => switchProvider(key),
+  }));
+
   const template = [
     { label: 'Bruce', type: 'checkbox', checked: true, click: (item) => toggleCharacter(0, item.checked) },
     { label: 'Jazz',  type: 'checkbox', checked: true, click: (item) => toggleCharacter(1, item.checked) },
     { type: 'separator' },
-    { label: 'Sounds', type: 'checkbox', checked: soundsEnabled, click: (item) => { soundsEnabled = item.checked; } },
+    { label: 'Provider', submenu: providerSubmenu },
     { type: 'separator' },
+    { label: 'Sounds', type: 'checkbox', checked: soundsEnabled, click: (item) => { soundsEnabled = item.checked; } },
     { label: 'Style', submenu: THEMES.map(t => ({
       label: t, type: 'radio', checked: t === currentTheme,
       click: () => { currentTheme = t; characters.forEach(c => { if (c.popoverWin && !c.popoverWin.isDestroyed()) c.popoverWin.webContents.send('theme-change', t); }); },
