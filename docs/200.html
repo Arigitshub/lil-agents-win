@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lil agents win — AI companions for your Windows taskbar</title>
+  <meta name="description" content="Tiny AI companions that walk on your Windows taskbar. Open-source desktop pets powered by Claude, Codex, Gemini, Copilot & more.">
+  <meta name="keywords" content="AI agents, Windows, taskbar, desktop pet, Claude, Codex, Gemini, Electron, open source">
+  <meta name="author" content="Arigitshub">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="lil agents win — AI companions for your Windows taskbar">
+  <meta property="og:description" content="Bruce & Jazz walk above your taskbar. Click to open an AI terminal. Supports Claude, Codex, Gemini, Copilot & more.">
+  <meta property="og:url" content="https://lil-agents-win.surge.sh">
+  <meta property="og:image" content="https://raw.githubusercontent.com/Arigitshub/lil-agents-win/main/public/assets/hero.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="lil agents win — AI companions for your Windows taskbar">
+  <meta name="twitter:description" content="Bruce & Jazz walk above your taskbar. Click to chat with any AI.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/Arigitshub/lil-agents-win/main/public/assets/hero.png">
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://lil-agents-win.surge.sh">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- GoatCounter Analytics (free, privacy-friendly, gives dashboard) -->
+  <script data-goatcounter="https://lil-agents-win.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-hover: #1a1a25;
+      --accent-pink: #f28ca5;
+      --accent-orange: #ff8a4c;
+      --accent-purple: #a78bfa;
+      --accent-green: #4ade80;
+      --accent-blue: #60a5fa;
+      --text-primary: #f4f4f8;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --border: rgba(255,255,255,0.06);
+      --glow-pink: rgba(242,140,165,0.15);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── Ambient background ── */
+    .ambient {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 0;
+    }
+    .ambient::before {
+      content: '';
+      position: absolute;
+      top: -20%; left: -10%;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--glow-pink) 0%, transparent 70%);
+      border-radius: 50%;
+      animation: float1 20s ease-in-out infinite;
+    }
+    .ambient::after {
+      content: '';
+      position: absolute;
+      bottom: -10%; right: -10%;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(167,139,250,0.08) 0%, transparent 70%);
+      border-radius: 50%;
+      animation: float2 25s ease-in-out infinite;
+    }
+    @keyframes float1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(100px,80px); } }
+    @keyframes float2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-80px,-60px); } }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      font-weight: 800; font-size: 1.1rem;
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent-orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+    .nav-links a {
+      color: var(--text-secondary); text-decoration: none;
+      font-size: 0.85rem; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text-primary); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent-orange));
+      color: #fff !important; padding: 6px 16px; border-radius: 8px;
+      font-weight: 600;
+    }
+    .nav-cta:hover { opacity: 0.9; }
+
+    /* ── Container ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; position: relative; z-index: 1; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 140px 0 80px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(242,140,165,0.1);
+      border: 1px solid rgba(242,140,165,0.2);
+      padding: 4px 14px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 600;
+      color: var(--accent-pink);
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.5px;
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 1.2rem;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-pink) 50%, var(--accent-orange) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 620px;
+      margin: 0 auto 2rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: 12px;
+      text-decoration: none; font-weight: 600; font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent-orange));
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(242,140,165,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(242,140,165,0.4); }
+    .btn-secondary {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    .btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--accent-pink); }
+
+    .hero-image {
+      margin-top: 3rem;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 80px rgba(0,0,0,0.5);
+    }
+    .hero-image img { width: 100%; display: block; }
+
+    /* ── Install snippet ── */
+    .install-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      margin: 3rem auto 0;
+      max-width: 500px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--accent-green);
+      position: relative;
+    }
+    .install-box .line { margin-bottom: 4px; }
+    .install-box .comment { color: var(--text-muted); }
+    .install-copy {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px; border-radius: 6px;
+      cursor: pointer; font-size: 0.7rem;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.2s;
+    }
+    .install-copy:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+
+    /* ── Section ── */
+    section { padding: 80px 0; }
+    .section-label {
+      display: inline-block;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent-pink);
+      margin-bottom: 0.8rem;
+    }
+    section h2 {
+      font-size: 2.2rem; font-weight: 800;
+      margin-bottom: 1rem;
+    }
+    section .section-desc {
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+      max-width: 600px;
+      margin-bottom: 3rem;
+    }
+
+    /* ── Feature grid ── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.2rem;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.8rem;
+      transition: all 0.3s;
+    }
+    .feature-card:hover {
+      border-color: rgba(242,140,165,0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .feature-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.8rem;
+      display: block;
+    }
+    .feature-card h3 {
+      font-size: 1rem; font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .feature-card p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ── Provider table ── */
+    .provider-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .provider-table th {
+      background: var(--bg-card);
+      padding: 14px 20px;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .provider-table td {
+      padding: 14px 20px;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .provider-table tr:last-child td { border-bottom: none; }
+    .provider-table tr:hover td { background: var(--bg-card-hover); }
+    .provider-table code {
+      background: rgba(255,255,255,0.05);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent-green);
+    }
+    .provider-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .badge-stream { background: rgba(74,222,128,0.15); color: var(--accent-green); }
+    .badge-spawn { background: rgba(96,165,250,0.15); color: var(--accent-blue); }
+
+    /* ── Cookbook ── */
+    .cookbook-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .recipe-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+      transition: all 0.3s;
+    }
+    .recipe-card:hover {
+      border-color: rgba(167,139,250,0.3);
+      transform: translateY(-2px);
+    }
+    .recipe-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent-purple);
+      margin-bottom: 0.8rem;
+      letter-spacing: 1px;
+    }
+    .recipe-card h3 {
+      font-size: 1.1rem; font-weight: 700;
+      margin-bottom: 0.6rem;
+    }
+    .recipe-card p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+    .recipe-code {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--accent-green);
+      overflow-x: auto;
+    }
+
+    /* ── Architecture ── */
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+    .arch-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+    }
+    .arch-card h3 {
+      font-size: 1rem; font-weight: 700;
+      margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .arch-item {
+      display: flex; justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .arch-item:last-child { border-bottom: none; }
+    .arch-label { color: var(--text-muted); }
+    .arch-value { font-weight: 600; color: var(--accent-pink); }
+
+    /* ── Themes showcase ── */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+    .theme-swatch {
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .theme-swatch:hover { transform: scale(1.03); }
+    .theme-swatch h4 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+    .theme-swatch p { font-size: 0.75rem; opacity: 0.8; }
+    .swatch-peach { background: linear-gradient(135deg, #fff0e0, #fdd); color: #d95973; border: 1px solid rgba(242,140,165,0.3); }
+    .swatch-midnight { background: linear-gradient(135deg, #1a1a2e, #0f0f1a); color: #ff6600; border: 1px solid rgba(255,102,0,0.3); }
+    .swatch-cloud { background: linear-gradient(135deg, #e8ecf2, #f5f7fa); color: #4d4d59; border: 1px solid rgba(200,210,220,0.5); }
+    .swatch-moss { background: linear-gradient(135deg, #c5ccb8, #d5dcc8); color: #374028; border: 1px solid rgba(140,148,128,0.5); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 0;
+      text-align: center;
+    }
+    .footer-links { display: flex; justify-content: center; gap: 2rem; margin-bottom: 1.5rem; list-style: none; }
+    .footer-links a {
+      color: var(--text-muted); text-decoration: none;
+      font-size: 0.85rem; transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--accent-pink); }
+    .footer-copy {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .footer-heart { color: var(--accent-pink); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .arch-grid { grid-template-columns: 1fr; }
+      .theme-grid { grid-template-columns: repeat(2, 1fr); }
+      .nav-links { display: none; }
+      nav { padding: 0 1rem; }
+      .hero { padding: 100px 0 60px; }
+    }
+  </style>
+</head>
+<body>
+<div class="ambient"></div>
+
+<!-- ── Nav ── -->
+<nav>
+  <div class="nav-brand">lil agents win</div>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#providers">Providers</a></li>
+    <li><a href="#cookbook">Cookbook</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#themes">Themes</a></li>
+    <li><a href="https://github.com/Arigitshub/lil-agents-win" class="nav-cta">⭐ GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="container">
+    <span class="hero-badge">🖥️ OPEN SOURCE • WINDOWS NATIVE</span>
+    <h1>AI companions for your Windows taskbar</h1>
+    <p>Bruce & Jazz walk above your taskbar. Click one to open an AI terminal powered by Claude, Codex, Gemini, Copilot, or OpenCode. They think, they vibe, they code.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/Arigitshub/lil-agents-win" class="btn btn-primary">
+        ⭐ Star on GitHub
+      </a>
+      <a href="#quickstart" class="btn btn-secondary">
+        ⚡ Quick Start
+      </a>
+    </div>
+    <div class="hero-image">
+      <img src="https://raw.githubusercontent.com/Arigitshub/lil-agents-win/main/public/assets/hero.png" alt="lil agents win — AI characters walking on Windows taskbar" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- ── Quick Start ── -->
+<section id="quickstart">
+  <div class="container" style="text-align: center;">
+    <span class="section-label">⚡ Quick Start</span>
+    <h2>3 commands. That's it.</h2>
+    <div class="install-box">
+      <button class="install-copy" onclick="copyInstall()">Copy</button>
+      <div class="line">git clone https://github.com/Arigitshub/lil-agents-win.git</div>
+      <div class="line">cd lil-agents-win && npm install</div>
+      <div class="line">npm start</div>
+      <div class="line comment"># Bruce & Jazz appear above your taskbar ✨</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ── -->
+<section id="features">
+  <div class="container">
+    <span class="section-label">✨ Features</span>
+    <h2>Everything you need</h2>
+    <p class="section-desc">A faithful port of the macOS original, rebuilt natively for Windows with Electron.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <span class="feature-icon">🚶</span>
+        <h3>Animated Characters</h3>
+        <p>Transparent WebM videos with alpha channels. Smooth eased motion curves — acceleration, cruise, and deceleration per character.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🤖</span>
+        <h3>Multi-Provider AI</h3>
+        <p>Switch between Claude, Codex, Gemini, Copilot, and OpenCode from the system tray. Auto-detects which CLIs you have installed.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">💬</span>
+        <h3>Click to Chat</h3>
+        <p>Click any character to open a themed terminal popover. Full streaming responses, tool use indicators, and slash commands.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">💭</span>
+        <h3>Thinking Bubbles</h3>
+        <p>Playful phrases float above characters while they work. "vibing...", "cooking...", "don't rush me", "connecting dots".</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🎨</span>
+        <h3>Four Themes</h3>
+        <p>Peach, Midnight, Cloud, and Moss. Each with a distinct personality — from playful pink to terminal-hacker green.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🖥️</span>
+        <h3>Taskbar Native</h3>
+        <p>Characters walk <em>above</em> your Windows taskbar using transparent BrowserWindows. Always-on-top, click-through, and DPI-aware.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Providers ── -->
+<section id="providers">
+  <div class="container">
+    <span class="section-label">🤖 Providers</span>
+    <h2>Bring your own AI</h2>
+    <p class="section-desc">Switch between providers from the system tray → Provider menu. The app auto-detects which CLIs are in your PATH.</p>
+    <table class="provider-table">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Binary</th>
+          <th>Install</th>
+          <th>Mode</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Claude</strong></td>
+          <td><code>claude</code></td>
+          <td><code>npm i -g @anthropic-ai/claude-code</code></td>
+          <td><span class="provider-badge badge-stream">Stream JSON</span></td>
+        </tr>
+        <tr>
+          <td><strong>Codex</strong></td>
+          <td><code>codex</code></td>
+          <td><code>npm i -g @openai/codex</code></td>
+          <td><span class="provider-badge badge-spawn">Per-message</span></td>
+        </tr>
+        <tr>
+          <td><strong>Gemini</strong></td>
+          <td><code>gemini</code></td>
+          <td><code>npm i -g @google/gemini-cli</code></td>
+          <td><span class="provider-badge badge-spawn">Per-message</span></td>
+        </tr>
+        <tr>
+          <td><strong>Copilot</strong></td>
+          <td><code>copilot</code></td>
+          <td><code>npm i -g @github/copilot-cli</code></td>
+          <td><span class="provider-badge badge-spawn">Per-message</span></td>
+        </tr>
+        <tr>
+          <td><strong>OpenCode</strong></td>
+          <td><code>opencode</code></td>
+          <td><code>curl -fsSL https://opencode.ai/install | bash</code></td>
+          <td><span class="provider-badge badge-spawn">Per-message</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Cookbook ── -->
+<section id="cookbook">
+  <div class="container">
+    <span class="section-label">📖 Cookbook</span>
+    <h2>Recipes & playbook</h2>
+    <p class="section-desc">Practical guides for getting the most out of your AI companions.</p>
+    <div class="cookbook-grid">
+      <div class="recipe-card">
+        <div class="recipe-num">RECIPE 01</div>
+        <h3>Pair Programming</h3>
+        <p>Let Bruce handle code reviews while you focus on writing features. Click him, describe the file, and watch the magic.</p>
+        <div class="recipe-code">
+          "Review src/main.js for bugs<br>and suggest improvements"
+        </div>
+      </div>
+      <div class="recipe-card">
+        <div class="recipe-num">RECIPE 02</div>
+        <h3>Dual Agent Workflow</h3>
+        <p>Use Bruce for code questions and Jazz for documentation. Split your workflow between two always-available agents.</p>
+        <div class="recipe-code">
+          Bruce → "Fix the login bug"<br>
+          Jazz → "Write docs for auth flow"
+        </div>
+      </div>
+      <div class="recipe-card">
+        <div class="recipe-num">RECIPE 03</div>
+        <h3>Provider Comparison</h3>
+        <p>Ask the same question using different providers. Switch from Claude to Codex mid-conversation to compare responses.</p>
+        <div class="recipe-code">
+          System tray → Provider → Codex<br>
+          "Explain this algorithm..."
+        </div>
+      </div>
+      <div class="recipe-card">
+        <div class="recipe-num">RECIPE 04</div>
+        <h3>Quick Lookups</h3>
+        <p>Use your agents like a smart search. Click, ask, and minimize — the thinking bubble tells you when they're done.</p>
+        <div class="recipe-code">
+          "What's the Node.js API for<br>reading directories recursively?"
+        </div>
+      </div>
+      <div class="recipe-card">
+        <div class="recipe-num">RECIPE 05</div>
+        <h3>Theme Matching</h3>
+        <p>Match your terminal theme to your mood. Midnight for late-night coding, Peach for creative work, Moss for focus.</p>
+        <div class="recipe-code">
+          System tray → Style → Midnight 🌙
+        </div>
+      </div>
+      <div class="recipe-card">
+        <div class="recipe-num">RECIPE 06</div>
+        <h3>Slash Commands</h3>
+        <p>Use <code>/clear</code> to reset the conversation and <code>/copy</code> to grab the last response to your clipboard.</p>
+        <div class="recipe-code">
+          /clear &nbsp;← reset session<br>
+          /copy &nbsp;&nbsp;← copy last response
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Architecture ── -->
+<section id="architecture">
+  <div class="container">
+    <span class="section-label">🏗️ Architecture</span>
+    <h2>How it works</h2>
+    <p class="section-desc">A faithful port of the macOS original, with platform-specific adaptations for Windows.</p>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <h3>🍎 macOS Original</h3>
+        <div class="arch-item"><span class="arch-label">Framework</span><span class="arch-value">Swift + AppKit</span></div>
+        <div class="arch-item"><span class="arch-label">Video</span><span class="arch-value">HEVC Alpha .mov</span></div>
+        <div class="arch-item"><span class="arch-label">Windows</span><span class="arch-value">NSWindow per character</span></div>
+        <div class="arch-item"><span class="arch-label">Render Loop</span><span class="arch-value">CVDisplayLink (60fps)</span></div>
+        <div class="arch-item"><span class="arch-label">Popover</span><span class="arch-value">NSPopover</span></div>
+        <div class="arch-item"><span class="arch-label">Tray</span><span class="arch-value">NSStatusItem</span></div>
+      </div>
+      <div class="arch-card">
+        <h3>🖥️ Windows Port</h3>
+        <div class="arch-item"><span class="arch-label">Framework</span><span class="arch-value">Electron + Node.js</span></div>
+        <div class="arch-item"><span class="arch-label">Video</span><span class="arch-value">VP9 Alpha .webm</span></div>
+        <div class="arch-item"><span class="arch-label">Windows</span><span class="arch-value">BrowserWindow per char</span></div>
+        <div class="arch-item"><span class="arch-label">Render Loop</span><span class="arch-value">setInterval (60fps)</span></div>
+        <div class="arch-item"><span class="arch-label">Popover</span><span class="arch-value">Separate BrowserWindow</span></div>
+        <div class="arch-item"><span class="arch-label">Tray</span><span class="arch-value">Electron Tray</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Themes ── -->
+<section id="themes">
+  <div class="container">
+    <span class="section-label">🎨 Themes</span>
+    <h2>Four personalities</h2>
+    <p class="section-desc">Switch themes from the system tray. Each has a unique color palette, font, and vibe.</p>
+    <div class="theme-grid">
+      <div class="theme-swatch swatch-peach">
+        <h4>🍑 Peach</h4>
+        <p>Playful pink & warm</p>
+      </div>
+      <div class="theme-swatch swatch-midnight">
+        <h4>🌙 Midnight</h4>
+        <p>Dark mode + orange</p>
+      </div>
+      <div class="theme-swatch swatch-cloud">
+        <h4>☁️ Cloud</h4>
+        <p>Clean Fluent UI</p>
+      </div>
+      <div class="theme-swatch swatch-moss">
+        <h4>🌿 Moss</h4>
+        <p>Retro organic</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ── -->
+<section style="padding: 80px 0; text-align: center;">
+  <div class="container">
+    <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Ready to meet Bruce & Jazz?</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 1.1rem;">Three commands and your desktop will never be the same.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/Arigitshub/lil-agents-win" class="btn btn-primary">⭐ Star on GitHub</a>
+      <a href="https://github.com/Arigitshub/lil-agents-win/fork" class="btn btn-secondary">🍴 Fork It</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="https://github.com/Arigitshub/lil-agents-win">GitHub</a></li>
+      <li><a href="https://github.com/Arigitshub/lil-agents-win/issues">Issues</a></li>
+      <li><a href="https://github.com/ryanstephen/lil-agents">macOS Original</a></li>
+      <li><a href="https://github.com/Arigitshub/lil-agents-win/blob/main/LICENSE">MIT License</a></li>
+    </ul>
+    <p class="footer-copy">Made with <span class="footer-heart">♥</span> for Windows users who deserve cute AI friends too.</p>
+  </div>
+</footer>
+
+<script>
+  function copyInstall() {
+    const text = 'git clone https://github.com/Arigitshub/lil-agents-win.git\ncd lil-agents-win && npm install\nnpm start';
+    navigator.clipboard.writeText(text);
+    const btn = document.querySelector('.install-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  }
+
+  // Smooth reveal on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.feature-card, .recipe-card, .arch-card, .theme-swatch').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'all 0.6s ease';
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>

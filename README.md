@@ -4,6 +4,8 @@
 
 **Tiny AI companions that live on your Windows taskbar.**
 
+[Visit the official docs: lil-agents-win.surge.sh](https://lil-agents-win.surge.sh) ✅
+
 Bruce and Jazz walk back and forth above your taskbar. Click one to open an AI terminal. They walk, they think, they vibe — now natively on Windows.
 
 > The Windows port of [lil-agents](https://github.com/ryanstephen/lil-agents) by [@ryanstephen](https://github.com/ryanstephen)
@@ -99,6 +101,12 @@ PRs welcome! Some ideas:
 - Add an installer/auto-updater
 - Multi-monitor support
 - Custom API endpoint support
+
+## 📊 ecosystem
+
+- **[Documentation Site](https://lil-agents-win.surge.sh)** — Detailed guides and feature breakdown.
+- **[Playbook & Cookbook](https://lil-agents-win.surge.sh#cookbook)** — Practical recipes for AI companion workflows.
+- **Support** — Open a [GitHub Issue](https://github.com/Arigitshub/lil-agents-win/issues) for bugs or feature requests.
 
 ## 📄 license
 
