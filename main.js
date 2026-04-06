@@ -429,8 +429,6 @@ function startSession(char) {
     return;
   }
 
-  char.providerKey = currentProvider;
-
   // For stream-json providers (Claude), spawn a persistent process
   if (prov.inputMode === 'stream-json') {
     const proc = spawn(prov.binary, prov.args, { shell: true, env: { ...process.env } });
