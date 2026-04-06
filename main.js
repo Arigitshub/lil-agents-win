@@ -262,6 +262,33 @@ app.whenReady().then(() => {
     const char = characters.find(c => c.popoverWin && c.popoverWin.webContents === e.sender);
     if (char) restartSession(char);
   });
+
+  ipcMain.on('switch-provider', (e, providerName) => {
+    // Provider name comes in like "Claude", "GeminiCLI"... 
+    // We need to find the key.
+    const key = Object.keys(PROVIDERS).find(k => PROVIDERS[k].name === providerName || k === providerName.toLowerCase());
+    if (key) switchProvider(key);
+  });
+
+  ipcMain.on('set-always-on-top', (e, value) => {
+    // Apply to all windows (characters and popovers)
+    characters.forEach(char => {
+      if (char.win && !char.win.isDestroyed()) {
+        char.win.setAlwaysOnTop(value, value ? 'screen-saver' : 'normal');
+      }
+      if (char.popoverWin && !char.popoverWin.isDestroyed()) {
+        char.popoverWin.setAlwaysOnTop(value, value ? 'pop-up-menu' : 'normal');
+      }
+    });
+  });
+
+  ipcMain.on('set-opacity', (e, value) => {
+    characters.forEach(char => {
+      if (char.win && !char.win.isDestroyed()) {
+        char.win.setOpacity(value);
+      }
+    });
+  });
 });
 
 app.on('window-all-closed', () => { /* keep tray alive */ });

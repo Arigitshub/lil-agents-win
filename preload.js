@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld('lilAgents', {
   characterClicked: () => ipcRenderer.send('character-clicked'),
   sendMessage:  (msg) => ipcRenderer.send('send-message', msg),
   resetSession: ()    => ipcRenderer.send('reset-session'),
+  switchProvider:(p)  => ipcRenderer.send('switch-provider', p),
+  setAlwaysOnTop:(v)  => ipcRenderer.send('set-always-on-top', v),
+  setOpacity:    (v)  => ipcRenderer.send('set-opacity', v),
 });
