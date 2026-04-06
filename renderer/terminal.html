@@ -164,17 +164,24 @@
     min-width: 140px;
   }
   .theme-midnight .dropdown { background: #1e1e1e; border-color: #333; color: #fff; }
+  .theme-cloud .dropdown    { background: #fff; border-color: #ddd; color: #333; }
+  .theme-moss .dropdown     { background: #dcdcc8; border-color: #8c9480; color: #1a1f14; }
   .dropdown.show { display: flex; }
   .dropdown-item {
     padding: 8px 14px;
     cursor: pointer;
     font-size: 11px;
     font-weight: 500;
-    transition: background 0.2s;
+    transition: background 0.2s, color 0.1s;
   }
   .dropdown-item:hover { background: rgba(0,0,0,0.05); }
   .theme-midnight .dropdown-item:hover { background: rgba(255,255,255,0.1); }
   .dropdown-item.active { color: var(--accent-color, #d95973); font-weight: 800; }
+  
+  .theme-peach .dropdown-item.active    { color: #d95973; }
+  .theme-midnight .dropdown-item.active { color: #ff6600; }
+  .theme-cloud .dropdown-item.active    { color: #0078d4; }
+  .theme-moss .dropdown-item.active     { color: #374028; }
   
   #provider-selector { left: 12px; }
   #settings-menu      { right: 12px; }
@@ -218,7 +225,7 @@
 <body class="theme-peach">
 <div id="container">
   <div class="titlebar">
-    <span id="title"><span id="agent-label"></span> — <span id="provider-label" class="provider-clickable"></span></span>
+    <span id="title"><span id="agent-label"></span> — <span id="provider-label" class="provider-clickable"></span> <span style="font-size: 8px; opacity: 0.6;">▼</span></span>
     <div class="titlebar-buttons">
       <button id="btn-refresh" title="Reset session">↻</button>
       <button id="btn-copy" title="Copy last response">⧉</button>
@@ -302,6 +309,12 @@
     window.lilAgents.setAlwaysOnTop(isOn);
   });
 
+  window.lilAgents.onBringToFront(() => {
+    // Force show/focus
+    providerDropdown.classList.remove('show');
+    settingsDropdown.classList.remove('show');
+  });
+
   sliderOpacity.addEventListener('input', () => {
     const val = parseInt(sliderOpacity.value);
     labelOpacity.textContent = `${val}%`;
@@ -325,7 +338,10 @@
     div.className = `msg msg-${role}`;
     div.textContent = text;
     messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    // Smooth scroll with small delay to ensure rendering
+    requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+    });
     return div;
   }
 
@@ -334,7 +350,9 @@
     div.className = 'tool-use';
     div.textContent = `⚙ ${name}: ${summary}`;
     messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+    });
   }
 
   // Send user message

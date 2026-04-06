@@ -2,6 +2,7 @@
   "name": "lil-agents-win",
   "version": "1.0.0",
   "description": "Tiny AI companions that live on your Windows taskbar",
+  "author": "Arigitshub",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

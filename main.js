@@ -234,10 +234,20 @@ app.whenReady().then(() => {
     accelStart: 3.9, fullSpeedStart: 4.5, decelStart: 8.0, walkStop: 8.75,
     walkAmountRange: [0.35, 0.6], yOffset: -7, startPos: 0.7,
   });
+  const moe = new WalkerCharacter('Moe', 'walk-jazz.webm', { // fallback to jazz video but with moe logic
+    accelStart: 2.5, fullSpeedStart: 3.0, decelStart: 7.5, walkStop: 8.0,
+    walkAmountRange: [0.5, 0.8], yOffset: -5, startPos: 0.5,
+  });
+  moe.yOffset = -10;
   jazz.pauseEndTime = Date.now() + randomRange(8000, 14000);
 
-  characters = [bruce, jazz];
-  characters.forEach(c => createCharacterWindow(c));
+  characters = [bruce, jazz, moe];
+  // Initial state: hide Moe, let user ADD him
+  moe.hidden = true;
+  
+  characters.forEach(c => {
+     if (!c.hidden) createCharacterWindow(c);
+  });
   setupTray();
   startTick();
 
@@ -275,9 +285,12 @@ app.whenReady().then(() => {
     characters.forEach(char => {
       if (char.win && !char.win.isDestroyed()) {
         char.win.setAlwaysOnTop(value, value ? 'screen-saver' : 'normal');
+        // BUGFIX: Show in taskbar if NOT on top, so they can be found!
+        char.win.setSkipTaskbar(!value); 
       }
       if (char.popoverWin && !char.popoverWin.isDestroyed()) {
         char.popoverWin.setAlwaysOnTop(value, value ? 'pop-up-menu' : 'normal');
+        char.popoverWin.setSkipTaskbar(!value);
       }
     });
   });
@@ -579,8 +592,12 @@ function rebuildTrayMenu() {
   }));
 
   const template = [
-    { label: 'Bruce', type: 'checkbox', checked: true, click: (item) => toggleCharacter(0, item.checked) },
-    { label: 'Jazz',  type: 'checkbox', checked: true, click: (item) => toggleCharacter(1, item.checked) },
+    { label: 'Bring All to Front', click: () => bringAllToFront() },
+    { label: 'Reset Positions',    click: () => resetPositions() },
+    { type: 'separator' },
+    { label: 'Bruce', type: 'checkbox', checked: !characters[0].hidden, click: (item) => toggleCharacter(0, item.checked) },
+    { label: 'Jazz',  type: 'checkbox', checked: !characters[1].hidden, click: (item) => toggleCharacter(1, item.checked) },
+    { label: 'Moe (Added)', type: 'checkbox', checked: !characters[2].hidden, click: (item) => toggleCharacter(2, item.checked) },
     { type: 'separator' },
     { label: 'Provider', submenu: providerSubmenu },
     { type: 'separator' },
@@ -598,11 +615,45 @@ function rebuildTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate(template));
 }
 
+function bringAllToFront() {
+  characters.forEach(char => {
+    if (char.win && !char.win.isDestroyed()) {
+      char.win.show();
+      char.win.focus();
+    }
+    if (char.popoverWin && !char.popoverWin.isDestroyed()) {
+      char.popoverWin.show();
+      char.popoverWin.focus();
+      char.popoverWin.webContents.send('bring-to-front');
+    }
+  });
+}
+
+function resetPositions() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const wa = primaryDisplay.workArea;
+  const areaWidth = wa.width - 100;
+  
+  characters[0].positionProgress = 0.3;
+  characters[1].positionProgress = 0.7;
+  
+  characters.forEach(char => {
+    if (char.popoverWin && !char.popoverWin.isDestroyed()) {
+      closePopover(char);
+    }
+  });
+}
+
 function toggleCharacter(idx, visible) {
   const char = characters[idx];
   if (!char) return;
+  char.hidden = !visible;
   if (visible) {
-    if (char.win && !char.win.isDestroyed()) char.win.show();
+    if (char.win && !char.win.isDestroyed()) {
+      char.win.show();
+    } else {
+      createCharacterWindow(char);
+    }
   } else {
     if (char.win && !char.win.isDestroyed()) char.win.hide();
     if (char.popoverWin && !char.popoverWin.isDestroyed()) char.popoverWin.hide();
