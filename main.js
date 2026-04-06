@@ -238,7 +238,7 @@ app.whenReady().then(() => {
   jazz.providerKey = defaultProv;
   jazz.pauseEndTime = Date.now() + randomRange(8000, 14000);
 
-  const moe = new WalkerCharacter('Moe', 'walk-jazz.webm', { 
+  const moe = new WalkerCharacter('Moe', 'walk-moe.png', { 
     accelStart: 2.5, fullSpeedStart: 3.0, decelStart: 7.5, walkStop: 8.0,
     walkAmountRange: [0.5, 0.8], yOffset: -5, startPos: 0.5,
   });
