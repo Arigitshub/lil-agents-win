@@ -298,7 +298,7 @@
   document.querySelectorAll('#provider-selector .dropdown-item').forEach(item => {
     item.addEventListener('click', () => {
       const newProvider = item.getAttribute('data-provider');
-      window.lilAgents.switchProvider(newProvider);
+      window.lilAgents.switchProvider({ characterName: agentName, providerName: newProvider });
       providerDropdown.classList.remove('show');
     });
   });

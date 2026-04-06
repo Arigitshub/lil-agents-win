@@ -89,6 +89,8 @@ class WalkerCharacter {
     // Agent session
     this.process = null;
     this.isBusy  = false;
+    this.providerKey = 'claude'; // default per char
+    this.hidden = false;
   }
 
   // Movement curve (matches Swift movementPosition)
@@ -215,35 +217,35 @@ let tickInterval = null;
 
 const THEMES = ['Peach', 'Midnight', 'Cloud', 'Moss'];
 let currentTheme = 'Peach';
-let currentProvider = 'claude';
 let soundsEnabled = true;
 let availableProviders = {};
 
 app.whenReady().then(() => {
   availableProviders = detectAvailableProviders();
-  // Auto-select first available provider
-  const firstAvailable = Object.keys(PROVIDERS).find(k => availableProviders[k]);
-  if (firstAvailable) currentProvider = firstAvailable;
+  const defaultProv = Object.keys(PROVIDERS).find(k => availableProviders[k]) || 'claude';
 
   // Create characters
   const bruce = new WalkerCharacter('Bruce', 'walk-bruce.webm', {
     accelStart: 3.0, fullSpeedStart: 3.75, decelStart: 8.0, walkStop: 8.5,
     walkAmountRange: [0.4, 0.65], yOffset: -3, startPos: 0.3,
   });
+  bruce.providerKey = defaultProv;
+
   const jazz = new WalkerCharacter('Jazz', 'walk-jazz.webm', {
     accelStart: 3.9, fullSpeedStart: 4.5, decelStart: 8.0, walkStop: 8.75,
     walkAmountRange: [0.35, 0.6], yOffset: -7, startPos: 0.7,
   });
-  const moe = new WalkerCharacter('Moe', 'walk-jazz.webm', { // fallback to jazz video but with moe logic
+  jazz.providerKey = defaultProv;
+  jazz.pauseEndTime = Date.now() + randomRange(8000, 14000);
+
+  const moe = new WalkerCharacter('Moe', 'walk-jazz.webm', { 
     accelStart: 2.5, fullSpeedStart: 3.0, decelStart: 7.5, walkStop: 8.0,
     walkAmountRange: [0.5, 0.8], yOffset: -5, startPos: 0.5,
   });
-  moe.yOffset = -10;
-  jazz.pauseEndTime = Date.now() + randomRange(8000, 14000);
+  moe.providerKey = defaultProv;
+  moe.hidden = true;
 
   characters = [bruce, jazz, moe];
-  // Initial state: hide Moe, let user ADD him
-  moe.hidden = true;
   
   characters.forEach(c => {
      if (!c.hidden) createCharacterWindow(c);
@@ -273,11 +275,12 @@ app.whenReady().then(() => {
     if (char) restartSession(char);
   });
 
-  ipcMain.on('switch-provider', (e, providerName) => {
-    // Provider name comes in like "Claude", "GeminiCLI"... 
-    // We need to find the key.
+  ipcMain.on('switch-provider', (e, { characterName, providerName }) => {
+    const char = characters.find(c => c.name === characterName);
+    if (!char) return;
+
     const key = Object.keys(PROVIDERS).find(k => PROVIDERS[k].name === providerName || k === providerName.toLowerCase());
-    if (key) switchProvider(key);
+    if (key) switchProvider(char, key);
   });
 
   ipcMain.on('set-always-on-top', (e, value) => {
@@ -384,7 +387,7 @@ function openPopover(char) {
     });
     pop.setAlwaysOnTop(true, 'pop-up-menu');
     pop.loadFile(path.join(__dirname, 'renderer', 'terminal.html'), {
-      query: { name: char.name, theme: currentTheme, provider: PROVIDERS[currentProvider].name },
+      query: { name: char.name, theme: currentTheme, provider: PROVIDERS[char.providerKey].name },
     });
     char.popoverWin = pop;
 
@@ -414,11 +417,11 @@ function closePopover(char) {
 function startSession(char) {
   if (char.process) return;
 
-  const prov = PROVIDERS[currentProvider];
+  const prov = PROVIDERS[char.providerKey];
   if (!prov) return;
 
   // Check if the provider binary is available
-  if (!availableProviders[currentProvider]) {
+  if (!availableProviders[char.providerKey]) {
     if (char.popoverWin && !char.popoverWin.isDestroyed()) {
       char.popoverWin.webContents.send('cli-error',
         `${prov.name} CLI not found.\n\nInstall it:\n  ${prov.install}`);
@@ -501,8 +504,7 @@ function setupProcessHandlers(char, proc) {
 
 // Handle sending messages — supports both stream-json and arg-based providers
 function sendMessage(char, msg) {
-  const provKey = char.providerKey || currentProvider;
-  const prov = PROVIDERS[provKey];
+  const prov = PROVIDERS[char.providerKey];
   if (!prov) return;
 
   char.isBusy = true;
@@ -535,29 +537,23 @@ function restartSession(char) {
   startSession(char);
 }
 
-function switchProvider(providerKey) {
-  if (currentProvider === providerKey) return;
-  currentProvider = providerKey;
+function switchProvider(char, providerKey) {
+  if (char.providerKey === providerKey) return;
+  
+  if (char.process) { try { char.process.kill(); } catch (e) {} }
+  char.process = null;
+  char.isBusy = false;
+  char.providerKey = providerKey;
 
-  // Kill all existing sessions and restart with new provider
-  characters.forEach(c => {
-    if (c.process) { try { c.process.kill(); } catch (e) {} }
-    c.process = null;
-    c.isBusy = false;
-    c.providerKey = providerKey;
+  // Update terminal
+  if (char.popoverWin && !char.popoverWin.isDestroyed()) {
+    char.popoverWin.webContents.send('provider-change', PROVIDERS[providerKey].name);
+  }
 
-    // Update terminal
-    if (c.popoverWin && !c.popoverWin.isDestroyed()) {
-      c.popoverWin.webContents.send('provider-change', PROVIDERS[providerKey].name);
-    }
-
-    // Restart session if popover is open
-    if (c.isIdle) {
-      startSession(c);
-    }
-  });
-
-  rebuildTrayMenu();
+  // Restart session if popover is open
+  if (char.isIdle) {
+    startSession(char);
+  }
 }
 
 // ── Tick loop (like CVDisplayLink) ──────────────────────────────────────────
@@ -594,14 +590,6 @@ function setupTray() {
 }
 
 function rebuildTrayMenu() {
-  const providerSubmenu = Object.entries(PROVIDERS).map(([key, prov]) => ({
-    label: `${prov.name}${availableProviders[key] ? '' : ' (not installed)'}`,
-    type: 'radio',
-    checked: key === currentProvider,
-    enabled: availableProviders[key],
-    click: () => switchProvider(key),
-  }));
-
   const template = [
     { label: 'Bring All to Front', click: () => bringAllToFront() },
     { label: 'Reset Positions',    click: () => resetPositions() },
@@ -610,7 +598,17 @@ function rebuildTrayMenu() {
     { label: 'Jazz',  type: 'checkbox', checked: !characters[1].hidden, click: (item) => toggleCharacter(1, item.checked) },
     { label: 'Moe (Added)', type: 'checkbox', checked: !characters[2].hidden, click: (item) => toggleCharacter(2, item.checked) },
     { type: 'separator' },
-    { label: 'Provider', submenu: providerSubmenu },
+    { label: 'Providers', submenu: characters.map(c => ({
+        label: `${c.name} Provider`,
+        enabled: !c.hidden,
+        submenu: Object.entries(PROVIDERS).map(([key, prov]) => ({
+            label: prov.name,
+            type: 'radio',
+            checked: c.providerKey === key,
+            enabled: availableProviders[key],
+            click: () => switchProvider(c, key)
+        }))
+    }))},
     { type: 'separator' },
     { label: 'Sounds', type: 'checkbox', checked: soundsEnabled, click: (item) => { soundsEnabled = item.checked; } },
     { label: 'Style', submenu: THEMES.map(t => ({
