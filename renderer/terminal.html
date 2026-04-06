@@ -87,6 +87,9 @@
     flex-shrink: 0;
     -webkit-app-region: drag;
   }
+  #title {
+    -webkit-app-region: no-drag;
+  }
   .titlebar-buttons {
     display: flex;
     gap: 6px;
@@ -162,6 +165,7 @@
     flex-direction: column;
     padding: 6px 0;
     min-width: 140px;
+    -webkit-app-region: no-drag;
   }
   .theme-midnight .dropdown { background: #1e1e1e; border-color: #333; color: #fff; }
   .theme-cloud .dropdown    { background: #fff; border-color: #ddd; color: #333; }
@@ -225,7 +229,7 @@
 <body class="theme-peach">
 <div id="container">
   <div class="titlebar">
-    <span id="title"><span id="agent-label"></span> — <span id="provider-label" class="provider-clickable"></span> <span style="font-size: 8px; opacity: 0.6;">▼</span></span>
+    <span id="title"><span id="agent-label"></span> — <span id="provider-label" class="provider-clickable"></span> <span id="arrow" style="font-size: 8px; opacity: 0.6; cursor: pointer;">▼</span></span>
     <div class="titlebar-buttons">
       <button id="btn-refresh" title="Reset session">↻</button>
       <button id="btn-copy" title="Copy last response">⧉</button>
@@ -252,10 +256,12 @@
            <span>Transparency</span>
            <span id="label-opacity">100%</span>
         </div>
-        <input type="range" id="slider-opacity" min="10" max="100" value="100" style="width: 100%; height: 4px; border-radius: 2px; -webkit-appearance: none; appearance: none; background: rgba(0,0,0,0.1); outline: none;">
+        <input type="range" id="slider-opacity" min="10" max="100" value="100" style="width: 100%; height: 4px; border-radius: 2px; -webkit-appearance: none; appearance: none; background: rgba(0,0,0,0.1); outline: none; cursor: pointer;">
       </div>
-      <div class="dropdown-item" id="add-character">Add Character...</div>
-      <div class="dropdown-item" id="customizations">Customizations...</div>
+      <div class="dropdown-item" id="btn-theme-peach">Theme: Peach</div>
+      <div class="dropdown-item" id="btn-theme-midnight">Theme: Midnight</div>
+      <div class="dropdown-item" id="btn-theme-cloud">Theme: Cloud</div>
+      <div class="dropdown-item" id="btn-theme-moss">Theme: Moss</div>
     </div>
   </div>
   <div class="separator"></div>
@@ -307,6 +313,13 @@
   toggleOntop.addEventListener('click', () => {
     const isOn = toggleOntop.classList.toggle('on');
     window.lilAgents.setAlwaysOnTop(isOn);
+  });
+
+  ['peach', 'midnight', 'cloud', 'moss'].forEach(t => {
+    document.getElementById(`btn-theme-${t}`).addEventListener('click', () => {
+        window.lilAgents.switchTheme(t);
+        settingsDropdown.classList.remove('show');
+    });
   });
 
   window.lilAgents.onBringToFront(() => {

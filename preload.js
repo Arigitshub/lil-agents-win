@@ -16,4 +16,5 @@ contextBridge.exposeInMainWorld('lilAgents', {
   switchProvider:(p)  => ipcRenderer.send('switch-provider', p),
   setAlwaysOnTop:(v)  => ipcRenderer.send('set-always-on-top', v),
   setOpacity:    (v)  => ipcRenderer.send('set-opacity', v),
+  switchTheme:   (t)  => ipcRenderer.send('switch-theme', t),
 });

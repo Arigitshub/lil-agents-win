@@ -302,6 +302,17 @@ app.whenReady().then(() => {
       }
     });
   });
+
+  ipcMain.on('switch-theme', (e, themeName) => {
+    const formatted = themeName.charAt(0).toUpperCase() + themeName.slice(1).toLowerCase();
+    currentTheme = formatted;
+    characters.forEach(c => {
+      if (c.popoverWin && !c.popoverWin.isDestroyed()) {
+        c.popoverWin.webContents.send('theme-change', formatted);
+      }
+    });
+    rebuildTrayMenu();
+  });
 });
 
 app.on('window-all-closed', () => { /* keep tray alive */ });
